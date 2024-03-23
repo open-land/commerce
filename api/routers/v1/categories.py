@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, status, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from api.schemas import models
+from api.schemas import models, types
 from api.deps import get_db, get_current_user, on_validate_admin
 import cloudinary
 import cloudinary.uploader
+from cloudinary import uploader
 import uuid
 
 router = APIRouter()
@@ -72,4 +73,32 @@ async def create_category(
     return {
         'message': 'new category was created',
         'status': status.HTTP_200_OK,
+    }
+
+@router.post("/delete")
+async def delete_category(
+    id: types.CategoryOptions,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user = (
+        db.query(models.User)
+        .filter(models.User.email == current_user.get("sub"))
+        .first()
+    )
+
+    on_validate_admin(user.role)
+
+    category = db.query(models.Category).filter(models.Category.id == id.id).first()
+
+    uploader.destroy(category.image_publi_id)
+
+    db.query(models.Category).filter(models.Category.id == id.id).delete()
+
+    db.commit()
+
+    return {
+        "message": "Delete categoty",
+        "db": category,
+        "status": status.HTTP_200_OK,
     }
